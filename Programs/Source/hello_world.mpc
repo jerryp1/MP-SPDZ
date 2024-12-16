@@ -1,0 +1,12 @@
+# hello_world.mpc
+from Compiler.library import print_ln
+from Compiler.compilerLib import Compiler
+
+compiler = Compiler()
+
+@compiler.register_function('helloworld')
+def hello_world():
+    print_ln('hello world')
+
+if __name__ == "__main__":
+    compiler.compile_func()
