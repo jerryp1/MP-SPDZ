@@ -1,0 +1,90 @@
+from Compiler.GC.types import sbits
+from Compiler.library import print_ln
+from Compiler.types import sint, sfix
+
+# 有效位
+V_LEN = 16
+# 浮点数整数形式的有效位
+V_LEN_SFIX = V_LEN + sfix.f
+
+# bit_compose/decompose都是只能操作一个数，而不是一个vector
+# 生成8个随机bit
+def sfix_to_sint(a):
+    return a.v
+def sint_to_sfix(a):
+    return a / (1 << sint(sfix.f))
+def bit_concat(a, b, bit_length_a, bit_length_b):
+    a_bits = a.bit_decompose(bit_length_a)
+    b_bits = b.bit_decompose(bit_length_b)
+    c_bits = a_bits + b_bits
+
+    return sint.bit_compose(c_bits)
+
+def bit_split(x, bit_length_a, bit_length_b):
+    length = bit_length_a + bit_length_b
+    x_bits = x.bit_decompose(length)
+    bits_a = [x_bits[i] for i in range(bit_length_a)]
+
+    bits_b = [x_bits[i] for i in range(bit_length_a, bit_length_a + bit_length_b)]
+    return sint.bit_compose(bits_a),sint.bit_compose(bits_b)
+
+# 如何把bitcompose后的数转换为sint?
+bits = [sbits.get_random_bit() for i in range(8)]
+a = sint.bit_compose(bits)
+print_ln("type:%s", str(type(a)))
+print_ln('random: %s', a.reveal())
+
+bits2 = a.bit_decompose(8)
+# 说明decompose的结果，低位存储低位。并且，compose时，也是低位解释为低位。
+# 以下是人工组合的过程
+bits3 = [bits2[i] for i in range(4)]
+bits4 = [bits2[i] for i in range(4, 8)]
+b = sint.bit_compose(bits3)
+c = sint.bit_compose(bits4)
+print_ln('b: %s', b.reveal())
+print_ln('c: %s', c.reveal())
+print_ln(str(type(bits2)))
+
+# 测试拼接和拆分
+d = bit_concat(b,c,4,4)
+print_ln(str(type(d)))
+print_ln('d: %s', d.reveal())
+e,f = bit_split(d, 4,4)
+print_ln('e: %s', e.reveal())
+print_ln('f: %s', f.reveal())
+
+# 测试sfix
+
+g = sfix(38.9)
+print_ln('g: %s', g.reveal())
+h = sfix_to_sint(g)
+print_ln('h: %s', h.reveal())
+i = sint_to_sfix(h)
+print_ln('i: %s', i.reveal())
+
+# 测试sfix的拼接和拆分
+j = sfix(33.1)
+k = sint(8)
+l = bit_concat(sfix_to_sint(j),k,V_LEN_SFIX,V_LEN)
+print_ln('l: %s', l.reveal())
+m,n = bit_split(l, V_LEN_SFIX, V_LEN)
+print_ln('m: %s', m.reveal())
+ss = sint_to_sfix(m)
+print_ln('sfix(m): %s', ss.reveal())
+print_ln('n: %s', n.reveal())
+
+
+# 以下测试bit compose的向量化，失败
+# a = sint(10)
+# b = sint(10)
+# c = sint(10)
+# list = Array(3, sint)
+# list[0] = a
+# list[1] = b
+# list[2] = c
+# d = list.bit_decompose(64)
+# e = sbits.bit_compose(b)
+# print_ln('e %s', e[1].reveal())
+
+
+

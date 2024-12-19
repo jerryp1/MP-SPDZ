@@ -1,17 +1,39 @@
 from Compiler.library import *
 from Compiler import mpc_math
+from Compiler.types import MultiArray
 
 # 训练数据量
 T_NUM = 3
 # 验证数据量
-V_NUM = 3
+V_NUM = 2
 # 特征数量
 F_NUM = 3
+# 有效位
+V_LEN = 16
+# 浮点数整数形式的有效位
+V_LEN_SFIX = V_LEN + sfix.f
 
+def sfix_to_sint(a):
+    return a.v
+def sint_to_sfix(a):
+    return a / (1 << sint(sfix.f))
+def bit_concat(a, b, bit_length_a, bit_length_b):
+    a_bits = a.bit_decompose(bit_length_a)
+    b_bits = b.bit_decompose(bit_length_b)
+    c_bits = a_bits + b_bits
+
+    return sint.bit_compose(c_bits)
+
+def bit_split(x, bit_length_a, bit_length_b):
+    length = bit_length_a + bit_length_b
+    x_bits = x.bit_decompose(length)
+    bits_a = [x_bits[i] for i in range(bit_length_a)]
+
+    bits_b = [x_bits[i] for i in range(bit_length_a, bit_length_a + bit_length_b)]
+    return sint.bit_compose(bits_a),sint.bit_compose(bits_b)
 
 # 验证函数
 def test(actual, expected):
-
     # you can reveal a number in order to print it
 
     actual = actual.reveal()
@@ -33,77 +55,96 @@ def dist(v1, v2, length):
         return distance
         # return sum_of_squares
 
-# 拼接两个数字
-def bit_concatenate(a, b, bit_length_a, bit_length_b):
-    # bit_length_a 和 bit_length_b 是 a 和 b 的二进制长度
-
-    # 将 b 向左移 bit_length_a 位来为 a 留出位置
-    shifted_b = b << bit_length_a
-
-    # 合并两个数字，a 直接加到移位后的 b 上
-    result = shifted_b + a
-
-    return result
-
 
 # 输入数据。暂时定义为，3个参与方 每方只有一条数据，包括3个特征
-x_train = MultiArray([3, 3], sfix)
-# x_train = [[sfix(0) for _ in range(3)] for _ in range(3)]
-y_train = Array(3, sfix)
+x_train = MultiArray([T_NUM, F_NUM], sfix)
+y_train = Array(T_NUM, sfix)
 
 # party0 input
-# x_train = Array(3, sfix)
-@for_range(3)
+@for_range(F_NUM)
 def f(i):
     x_train[0][i] = sfix.get_input_from(0)
 y_train[0] = sfix.get_input_from(0)
 
 # party1 input
-# x_train = Array(3, sfix)
-@for_range(3)
+@for_range(F_NUM)
 def f(i):
     x_train[1][i] = sfix.get_input_from(1)
 y_train[1] = sfix.get_input_from(1)
 
 # party2 input
-# x_train_2 = Array(3, sfix)
-@for_range(3)
+@for_range(F_NUM)
 def f(i):
     x_train[2][i] = sfix.get_input_from(2)
 y_train[2] = sfix.get_input_from(2)
 
 # party3 (buyer) input 两条数据*3个特征=6
-x_valid = MultiArray([2,3], sfix)
-y_valid = Array(2, sfix)
-@for_range(2)
+x_valid = MultiArray([V_NUM,F_NUM], sfix)
+y_valid = Array(V_NUM, sfix)
+@for_range(V_NUM)
 def f(i):
-    @for_range(3)
+    @for_range(F_NUM)
     def g(j):
         x_valid[i][j] = sfix.get_input_from(3)
-@for_range(2)
+@for_range(V_NUM)
 def f(i):
     y_valid[i] = sfix.get_input_from(3)
 
 print_ln('got %s', y_valid[0].reveal())
 
 # 对于每个valid数据都计算距离 TODO 是否要统一为sfix类型
-dists = MultiArray([2,3], sfix)
-@for_range(2)
+dists = MultiArray([V_NUM,T_NUM], sfix)
+@for_range(V_NUM)
 def f(i):
-    @for_range(3)
+    @for_range(T_NUM)
     def g(j):
-        dists[i][j] = dist(x_train[j], x_valid[i], 3)
+        dists[i][j] = dist(x_train[j], x_valid[i], F_NUM)
         print_ln('dist: %s', dists[i][j].reveal())
 
+# 二维数组，第一维度包含三个元素:距离，y，index，第二个维度是数据
+# 再加一维，多个valid num
+#sorted_dist = MultiArray([V_NUM,3,T_NUM],sfix)
+
+# @for_range(V_NUM)
+#def f(i):
+#    @for_range(T_NUM)
+#    def g(j):
+#        # dists
+#        sorted_dist[i][0][j] = dists[i][j]
+#        # y
+#       sorted_dist[i][1][j] = y_train[j]
+#        # index
+#        sorted_dist[i][2][j] = sfix(j)
+#        print_ln('sorted_dist[i][0][j]: %s', sorted_dist[i][0][j].reveal())
+#        print_ln('sorted_dist[i][1][j]: %s', sorted_dist[i][1][j].reveal())
+#        print_ln('sorted_dist[i][2][j]: %s', sorted_dist[i][2][j].reveal())
+
 # 计算排序
+# 串接距离和index
 
+sorted_dist = MultiArray([V_NUM,T_NUM],sfix)
 
+@for_range(V_NUM)
+def f(i):
+    @for_range(T_NUM)
+    def g(j):
+        sorted_dist[i][j]
+
+@for_range(V_NUM)
+def f(i):
+    @for_range(T_NUM)
+    def g(j):
+        print_ln('sorted_dist[i][0][j]: %s', sorted_dist[i][0][j].reveal())
+        print_ln('sorted_dist[i][1][j]: %s', sorted_dist[i][1][j].reveal())
+        print_ln('sorted_dist[i][2][j]: %s', sorted_dist[i][2][j].reveal())
 
 # TODO 这里如何获得密态permutation -> sort时带上index
 
 
+
 # TODO 如何应用permutation
-# TODO 如何将payload和index拼接到一起？
+# TODO 将payload y 和index拼接到一起？ 明文拼？密文拼？
+# TODO 拼完排序好后，需要拆开y，做equality test
 
 
 
