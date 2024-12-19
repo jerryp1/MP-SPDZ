@@ -13,6 +13,20 @@ V_LEN = 16
 # 浮点数整数形式的有效位
 V_LEN_SFIX = V_LEN + sfix.f
 
+def print_array_3d(x, len1, len2,len3):
+    @for_range(len1)
+    def f(i):
+        @for_range(len2)
+        def g(j):
+            values = [x[i][j][k].reveal() for k in range(len3)]
+            print_ln('x[%s][%s][:] = %s', i, j, values)
+
+def print_array_2d(x, len1, len2):
+    @for_range(len1)
+    def f(i):
+            values = [x[i][k].reveal() for k in range(len2)]
+            print_ln('x[%s][:] = %s', i, values)
+
 def sfix_to_sint(a):
     return a.v
 def sint_to_sfix(a):
@@ -92,7 +106,7 @@ def f(i):
 
 print_ln('got %s', y_valid[0].reveal())
 
-# 对于每个valid数据都计算距离 TODO 是否要统一为sfix类型
+# 对于每个valid数据都计算距离
 dists = MultiArray([V_NUM,T_NUM], sfix)
 @for_range(V_NUM)
 def f(i):
@@ -119,24 +133,48 @@ def f(i):
 #        print_ln('sorted_dist[i][1][j]: %s', sorted_dist[i][1][j].reveal())
 #        print_ln('sorted_dist[i][2][j]: %s', sorted_dist[i][2][j].reveal())
 
-# 计算排序
+to_be_sorted = MultiArray([V_NUM, T_NUM], sint)
+
 # 串接距离和index
-
-sorted_dist = MultiArray([V_NUM,T_NUM],sfix)
-
 @for_range(V_NUM)
 def f(i):
     @for_range(T_NUM)
     def g(j):
-        sorted_dist[i][j]
+        # 计算串接结果
+        concat_r = bit_concat(j,sfix_to_sint(dists[i][j]), V_LEN,V_LEN_SFIX)
+        to_be_sorted[i][j] = concat_r
 
+# 计算排序
+@for_range(V_NUM)
+def f(i):
+    to_be_sorted[i].sort()
+print_ln("after sort")
+print_array_2d(to_be_sorted, V_NUM, T_NUM)
+
+
+# 拆分出来，得到排序结果，以及permutation
+permutation = MultiArray([V_NUM, T_NUM], sint)
+sorted_dist = MultiArray([V_NUM, T_NUM], sfix)
 @for_range(V_NUM)
 def f(i):
     @for_range(T_NUM)
     def g(j):
-        print_ln('sorted_dist[i][0][j]: %s', sorted_dist[i][0][j].reveal())
-        print_ln('sorted_dist[i][1][j]: %s', sorted_dist[i][1][j].reveal())
-        print_ln('sorted_dist[i][2][j]: %s', sorted_dist[i][2][j].reveal())
+        a,b = bit_split(to_be_sorted[i][j], V_LEN, V_LEN_SFIX)
+        permutation[i][j] = a
+        sorted_dist[i][j] = sint_to_sfix(b)
+print_ln("after split, permutation")
+print_array_2d(permutation, V_NUM, T_NUM)
+print_ln("after split, sorted_list")
+print_array_2d(sorted_dist, V_NUM, T_NUM)
+
+
+# @for_range(V_NUM)
+# def f(i):
+#     @for_range(T_NUM)
+#     def g(j):
+#         print_ln('sorted_dist[i][0][j]: %s', sorted_dist[i][0][j].reveal())
+#         print_ln('sorted_dist[i][1][j]: %s', sorted_dist[i][1][j].reveal())
+#         print_ln('sorted_dist[i][2][j]: %s', sorted_dist[i][2][j].reveal())
 
 # TODO 这里如何获得密态permutation -> sort时带上index
 
