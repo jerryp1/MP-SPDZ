@@ -1,0 +1,123 @@
+from Compiler.library import *
+from Compiler import mpc_math
+from Compiler.types import MultiArray
+
+
+def print_array_3d(x, len1, len2,len3):
+    @for_range(len1)
+    def f(i):
+        @for_range(len2)
+        def g(j):
+            values = [x[i][j][k].reveal() for k in range(len3)]
+            print_ln('x[%s][%s][:] = %s', i, j, values)
+
+def print_array_2d(x, len1, len2):
+    @for_range(len1)
+    def f(i):
+            values = [x[i][k].reveal() for k in range(len2)]
+            print_ln('x[%s][:] = %s', i, values)
+
+def print_array(x, len1):
+    values = [x[k].reveal() for k in range(len1)]
+    print_ln('x[:] = %s',  values)
+
+def sfix_to_sint(a):
+    return a.v
+def sint_to_sfix(a):
+    return a / (1 << sint(sfix.f))
+def bit_concat(a, b, bit_length_a, bit_length_b):
+    a_bits = a.bit_decompose(bit_length_a)
+    b_bits = b.bit_decompose(bit_length_b)
+    c_bits = a_bits + b_bits
+
+    return sint.bit_compose(c_bits)
+
+def bit_split(x, bit_length_a, bit_length_b):
+    length = bit_length_a + bit_length_b
+    x_bits = x.bit_decompose(length)
+    bits_a = [x_bits[i] for i in range(bit_length_a)]
+
+    bits_b = [x_bits[i] for i in range(bit_length_a, bit_length_a + bit_length_b)]
+    return sint.bit_compose(bits_a),sint.bit_compose(bits_b)
+
+def secure_perm_inv(sp, v):
+    shuffle = sint.get_secure_shuffle(T_NUM)
+    sp.secure_permute(shuffle)
+    v.secure_permute(shuffle)
+    plain_sp = sp.reveal()
+    v.permute(plain_sp, True)
+    return v
+
+def secure_perm(sp, v):
+    shuffle = sint.get_secure_shuffle(T_NUM)
+    sp.secure_permute(shuffle)
+    plain_sp = sp.reveal()
+    v.permute(plain_sp, False)
+    v.secure_permute(shuffle, True)
+    return v
+
+# 验证函数
+def test(actual, expected):
+    # you can reveal a number in order to print it
+    actual = actual.reveal()
+    print_ln('expected %s, got %s', expected, actual)
+
+
+T_NUM = 4
+x = Array(T_NUM, sint)
+@for_range(T_NUM)
+def f(i):
+    x[i] = sint.get_input_from(0)
+
+print_ln("before shuffle")
+print_array(x, T_NUM)
+
+# x.secure_shuffle()
+
+print_ln("after shuffle")
+print_array(x, T_NUM)
+
+a = sint.get_secure_shuffle(T_NUM)
+print_ln("a type:%s", str(type(a)))
+print_ln("a value:%s", a)
+b  = regint(0)
+print_ln("b type:%s", str(type(b)))
+print_ln("b value:%s", b)
+
+
+
+print_ln("**test secure_perm()**")
+
+perm = Array(T_NUM, sint)
+@for_range(T_NUM)
+def f(i):
+    perm[i] = sint(i)
+
+perm.secure_shuffle()
+
+print_ln("before permute, x:")
+print_array(x, T_NUM)
+print_ln("before permute, perm:")
+print_array(perm, T_NUM)
+# permute
+permute_x = secure_perm(perm, x)
+
+perm.shuffle()
+
+print_ln("after permute")
+print_array(permute_x, T_NUM)
+
+
+print_ln("**test apply_perm_local()**")
+
+pp = perm.reveal()
+
+print_ln("before permute, x:")
+print_array(x, T_NUM)
+print_ln("before permute, pp:")
+print_array(pp, T_NUM)
+
+x.permute(pp)
+
+print_ln("after permute, x:")
+print_array(x, T_NUM)
