@@ -3,6 +3,33 @@ from Compiler import mpc_math
 from Compiler.types import MultiArray
 
 
+
+def copy_array_2d(a):
+    b = a.same_shape()
+    @for_range(len(a))
+    def f(i):
+        @for_range(len(a[0]))
+        def g(j):
+            b[i][j] = a[i][j]
+    return b
+
+def copy_array(a):
+    b = a.same_shape()
+    @for_range(len(a))
+    def g(i):
+        b[i] = a[i]
+    return b
+def test_array(actual,expected):
+    @for_range(len(actual))
+    def f(i):
+        print_ln("actual:%s, expected:%s", actual[i].reveal(),  expected[i].reveal())
+
+def test(actual, expected):
+    # you can reveal a number in order to print it
+    actual = actual.reveal()
+    print_ln('expected %s, got %s', expected, actual)
+
+
 def print_array_3d(x, len1, len2,len3):
     @for_range(len1)
     def f(i):
@@ -19,6 +46,10 @@ def print_array_2d(x, len1, len2):
 
 def print_array(x, len1):
     values = [x[k].reveal() for k in range(len1)]
+    print_ln('x[:] = %s',  values)
+
+def print_array_plain(x, len1):
+    values = [x[k] for k in range(len1)]
     print_ln('x[:] = %s',  values)
 
 def sfix_to_sint(a):
@@ -41,29 +72,62 @@ def bit_split(x, bit_length_a, bit_length_b):
     return sint.bit_compose(bits_a),sint.bit_compose(bits_b)
 
 def secure_perm_inv(sp, v):
-    shuffle = sint.get_secure_shuffle(T_NUM)
-    sp.secure_permute(shuffle)
-    v.secure_permute(shuffle)
-    plain_sp = sp.reveal()
-    v.permute(plain_sp, True)
-    return v
 
-def secure_perm(sp, v):
+    sp_copy = copy_array(sp)
+    v_copy = copy_array(v)
     shuffle = sint.get_secure_shuffle(T_NUM)
-    sp.secure_permute(shuffle)
-    plain_sp = sp.reveal()
-    v.permute(plain_sp, False)
-    v.secure_permute(shuffle, True)
-    return v
+    sp_copy.secure_permute(shuffle)
+    v_copy.secure_permute(shuffle)
+    plain_sp = sp_copy.reveal()
+    v_copy.permute(plain_sp, reverse = True)
+    return v_copy
+
+# sp：秘密分享的permutation， v待置换的数据
+# TODO 经验证，这个逻辑是有问题的
+def secure_perm(sp, v):
+    # 复制数据
+    # sp_copy = sp
+    # v_copy = v
+    sp_copy = copy_array(sp)
+    v_copy = copy_array(v)
+    print_ln("********")
+    print_ln("before shuffle, sp_copy:")
+    print_array(sp_copy, T_NUM)
+    print_ln("before shuffle, v_copy:")
+    print_array(v_copy, T_NUM)
+
+    # 获得一个安全shuffle
+    shuffle = sint.get_secure_shuffle(len(sp))
+    # 对sp进行shuffle
+    sp_copy.secure_permute(shuffle)
+
+    print_ln("after shuffle, sp_copy:")
+    print_array(sp_copy, T_NUM)
+
+    # 恢复shuffle后的sp明文
+    plain_sp = sp_copy.reveal()
+    print_ln("revealed plain_sp:")
+    print_array(plain_sp, T_NUM)
+
+    # 用plain_sp置换v
+    v_copy.permute(plain_sp)
+
+    print_ln("permuted v_copy:")
+    print_array(v_copy, T_NUM)
+
+
+    # 再对v进行de-shuffle
+    v_copy.secure_permute(shuffle, reverse=True)
+
+    print_ln("de-shuffled v_copy:")
+    print_array(v_copy, T_NUM)
+    print_ln("********")
+    return v_copy
 
 # 验证函数
-def test(actual, expected):
-    # you can reveal a number in order to print it
-    actual = actual.reveal()
-    print_ln('expected %s, got %s', expected, actual)
-
 
 T_NUM = 4
+V_NUM = 2
 x = Array(T_NUM, sint)
 @for_range(T_NUM)
 def f(i):
@@ -102,10 +166,20 @@ print_array(perm, T_NUM)
 # permute
 permute_x = secure_perm(perm, x)
 
-perm.shuffle()
+# perm.shuffle()
 
-print_ln("after permute")
+print_ln("after permute, permute_x")
 print_array(permute_x, T_NUM)
+print_ln("after permute, x")
+print_array(x, T_NUM)
+
+# assert
+plain_perm = perm.reveal()
+x.permute(plain_perm)
+
+print_ln("after permute2, permute_x")
+print_array(permute_x, T_NUM)
+test_array(permute_x, x)
 
 
 print_ln("**test apply_perm_local()**")
@@ -121,3 +195,58 @@ x.permute(pp)
 
 print_ln("after permute, x:")
 print_array(x, T_NUM)
+
+# print_ln("**test secure array permute**")
+#
+# v = Array(T_NUM, sint)
+# @for_range(T_NUM)
+# def f(i):
+#     v[i] = sint(i)
+#
+# v.secure_shuffle()
+#
+# permutation_array = MultiArray([V_NUM, T_NUM], sint)
+# @for_range(V_NUM)
+# def f(i):
+#     @for_range(T_NUM)
+#     def g(j):
+#         permutation_array[i][j] = sint(j)
+#     permutation_array[i].secure_shuffle()
+#
+# print_ln("before permute, v:")
+# print_array(v, T_NUM)
+# print_ln("before permute, permutation_array:")
+# print_array_2d(permutation_array, V_NUM,T_NUM)
+#
+# permuted_v = MultiArray([V_NUM, T_NUM], sint)
+# @for_range(V_NUM)
+# def f(i):
+#     permuted_v[i] = secure_perm(permutation_array[i], v)
+#
+# print_ln("after permute, permuted_v:")
+# print_array_2d(permuted_v, V_NUM, T_NUM)
+# print_ln("after permute, v:")
+# print_array(v, T_NUM)
+# print_ln("after permute, permutation_array:")
+# print_array_2d(permutation_array, V_NUM,T_NUM)
+
+
+
+print_ln("**test shuffle and de-shuffle**")
+
+v = Array(T_NUM, sint)
+w = Array(T_NUM, sint)
+@for_range(T_NUM)
+def f(i):
+    v[i] = sint(i)
+    w[i] = sint(i)
+
+shuffle = sint.get_secure_shuffle(T_NUM)
+
+v.secure_permute(shuffle)
+w.secure_permute(shuffle, reverse=True)
+
+print_ln("after shuffle, v:")
+print_array(v, T_NUM)
+print_ln("after shuffle, w:")
+print_array(w, T_NUM)

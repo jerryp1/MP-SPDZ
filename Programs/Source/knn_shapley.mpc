@@ -1,17 +1,59 @@
 from Compiler.library import *
 from Compiler import mpc_math
 from Compiler.types import MultiArray
+import copy
 
 # 训练数据量
 T_NUM = 3
 # 验证数据量
-V_NUM = 2
+V_NUM = 4
 # 特征数量
 F_NUM = 3
 # 有效位
 V_LEN = 16
 # 浮点数整数形式的有效位
 V_LEN_SFIX = V_LEN + sfix.f
+
+K = 2
+
+def copy_array_2d(a):
+    b = a.same_shape()
+    @for_range(len(a))
+    def f(i):
+        @for_range(len(a[0]))
+        def g(j):
+            b[i][j] = a[i][j]
+    return b
+
+def copy_array(a):
+    b = a.same_shape()
+    @for_range(len(a))
+    def g(i):
+        b[i] = a[i]
+    return b
+
+def secure_perm_inv(sp, v):
+    sp_copy = copy_array(sp)
+    v_copy = copy_array(v)
+
+    shuffle = sint.get_secure_shuffle(T_NUM)
+    sp_copy.secure_permute(shuffle)
+    v_copy.secure_permute(shuffle)
+    plain_sp = sp_copy.reveal()
+    v_copy.permute(plain_sp, reverse=True)
+    return v_copy
+
+# TODO 这块有问题
+def secure_perm(sp, v):
+    sp_copy = copy_array(sp)
+    v_copy = copy_array(v)
+
+    shuffle = sint.get_secure_shuffle(T_NUM)
+    sp_copy.secure_permute(shuffle)
+    plain_sp = sp_copy.reveal()
+    v_copy.permute(plain_sp)
+    v_copy.secure_permute(shuffle, reverse=True)
+    return v_copy
 
 def print_array_3d(x, len1, len2,len3):
     @for_range(len1)
@@ -26,6 +68,10 @@ def print_array_2d(x, len1, len2):
     def f(i):
             values = [x[i][k].reveal() for k in range(len2)]
             print_ln('x[%s][:] = %s', i, values)
+
+def print_array(x, len1):
+    values = [x[k].reveal() for k in range(len1)]
+    print_ln('x[:] = %s',  values)
 
 def sfix_to_sint(a):
     return a.v
@@ -72,27 +118,34 @@ def dist(v1, v2, length):
 
 # 输入数据。暂时定义为，3个参与方 每方只有一条数据，包括3个特征
 x_train = MultiArray([T_NUM, F_NUM], sfix)
-y_train = Array(T_NUM, sfix)
+y_train = Array(T_NUM, sint)
+y_train.alloc()
 
 # party0 input
 @for_range(F_NUM)
 def f(i):
     x_train[0][i] = sfix.get_input_from(0)
-y_train[0] = sfix.get_input_from(0)
+y_train[0] = sint.get_input_from(0)
 
 # party1 input
 @for_range(F_NUM)
 def f(i):
     x_train[1][i] = sfix.get_input_from(1)
-y_train[1] = sfix.get_input_from(1)
+y_train[1] = sint.get_input_from(1)
 
 # party2 input
 @for_range(F_NUM)
 def f(i):
     x_train[2][i] = sfix.get_input_from(2)
-y_train[2] = sfix.get_input_from(2)
+y_train[2] = sint.get_input_from(2)
 
-# party3 (buyer) input 两条数据*3个特征=6
+# party3 input
+# @for_range(F_NUM)
+# def f(i):
+#     x_train[3][i] = sfix.get_input_from(3)
+# y_train[3] = sint.get_input_from(3)
+
+# party4 (buyer) input 两条数据*3个特征=6
 x_valid = MultiArray([V_NUM,F_NUM], sfix)
 y_valid = Array(V_NUM, sfix)
 @for_range(V_NUM)
@@ -102,9 +155,8 @@ def f(i):
         x_valid[i][j] = sfix.get_input_from(3)
 @for_range(V_NUM)
 def f(i):
-    y_valid[i] = sfix.get_input_from(3)
+    y_valid[i] = sint.get_input_from(3)
 
-print_ln('got %s', y_valid[0].reveal())
 
 # 对于每个valid数据都计算距离
 dists = MultiArray([V_NUM,T_NUM], sfix)
@@ -136,6 +188,8 @@ def f(i):
 to_be_sorted = MultiArray([V_NUM, T_NUM], sint)
 
 # 串接距离和index
+print_ln("original dist(before concate)")
+print_array_2d(dists, V_NUM, T_NUM)
 @for_range(V_NUM)
 def f(i):
     @for_range(T_NUM)
@@ -145,10 +199,12 @@ def f(i):
         to_be_sorted[i][j] = concat_r
 
 # 计算排序
+print_ln("before sort(concated)")
+print_array_2d(to_be_sorted, V_NUM, T_NUM)
 @for_range(V_NUM)
 def f(i):
     to_be_sorted[i].sort()
-print_ln("after sort")
+print_ln("after sort(concated)")
 print_array_2d(to_be_sorted, V_NUM, T_NUM)
 
 
@@ -164,25 +220,101 @@ def f(i):
         sorted_dist[i][j] = sint_to_sfix(b)
 print_ln("after split, permutation")
 print_array_2d(permutation, V_NUM, T_NUM)
-print_ln("after split, sorted_list")
+print_ln("after split, sorted_dist")
 print_array_2d(sorted_dist, V_NUM, T_NUM)
 
 
+# 应用置换的逆，将dist置换回去
+# de_permuted_dist = MultiArray([V_NUM, T_NUM], sfix)
 # @for_range(V_NUM)
 # def f(i):
-#     @for_range(T_NUM)
-#     def g(j):
-#         print_ln('sorted_dist[i][0][j]: %s', sorted_dist[i][0][j].reveal())
-#         print_ln('sorted_dist[i][1][j]: %s', sorted_dist[i][1][j].reveal())
-#         print_ln('sorted_dist[i][2][j]: %s', sorted_dist[i][2][j].reveal())
-
-# TODO 这里如何获得密态permutation -> sort时带上index
+#     de_permuted_dist[i] = secure_perm_inv(permutation[i], sorted_dist[i])
+# print_ln("permute dist to original ones:")
+# print_array_2d(de_permuted_dist, V_NUM, T_NUM)
 
 
+# 应用permutation到y
+print_ln("before permute, y_train")
+print_array(y_train, T_NUM)
+print_ln("before permute, permutation")
+print_array_2d(permutation, V_NUM, T_NUM)
 
-# TODO 如何应用permutation
-# TODO 将payload y 和index拼接到一起？ 明文拼？密文拼？
-# TODO 拼完排序好后，需要拆开y，做equality test
+permuted_y = MultiArray([V_NUM, T_NUM], sint)
+@for_range(V_NUM)
+def f(i):
+    permuted_y[i] = secure_perm(permutation[i], y_train)
+
+print_ln("after permute, permuted_y")
+print_array_2d(permuted_y, V_NUM, T_NUM)
+print_ln("after permute, y_train")
+print_array(y_train, T_NUM)
+print_ln("after permute, permutation")
+print_array_2d(permutation, V_NUM, T_NUM)
+
+# print_ln("第一次被使用后的permutation")
+# print_array_2d(permutation, V_NUM, T_NUM)
+
+# 计算shapley
+shapley = MultiArray([V_NUM, T_NUM], sfix)
+equality = MultiArray([V_NUM, T_NUM], sfix)
+
+
+print_ln("y_valid:")
+print_array(y_valid, T_NUM)
+
+@for_range(V_NUM)
+def f(i):
+    # 计算第n个值的shapley
+    shapley[i][T_NUM - 1] = (permuted_y[i][T_NUM - 1] == y_valid[i]) / T_NUM
+    equality[i][T_NUM - 1] = (permuted_y[i][T_NUM - 1] == y_valid[i])
+    # 计算剩余n-1个值的shapley
+    @for_range(T_NUM - 1)
+    def g(j):
+        current_index = T_NUM - 2 - j
+        nomi1 = (permuted_y[i][current_index] == y_valid[i]) - (permuted_y[i][current_index + 1] == y_valid[i])
+        equality[i][current_index] = nomi1
+        # test1 = (permuted_y[i][current_index] == y_valid[i]) - (permuted_y[i][current_index + 1] == y_valid[i])
+        # print_ln("test1:%s", test.reveal())
+        nomi2 = (K < current_index).if_else(K, current_index + 1)
+        deno = K * (current_index + 1)
+        shapley[i][current_index] = shapley[i][current_index + 1] + (nomi1 * nomi2) / (deno)
+
+
+# 根据index恢复shapley的正确顺序
+# sorted_shapley = MultiArray([V_NUM, T_NUM], sint)
+# 只需要apply permutation的逆即可
+print_ln("equality")
+print_array_2d(equality, V_NUM, T_NUM)
+
+permuted_equality = equality.same_shape()
+@for_range(V_NUM)
+def f(i):
+    permuted_equality[i] = secure_perm_inv(permutation[i], equality[i])
+print_ln("permuted equality")
+print_array_2d(permuted_equality, V_NUM, T_NUM)
+
+
+print_ln("刚算出来的shapley")
+print_array_2d(shapley, V_NUM, T_NUM)
+
+@for_range(V_NUM)
+def f(i):
+    shapley[i] = secure_perm_inv(permutation[i], shapley[i])
+
+
+print_ln("shapley")
+print_array_2d(shapley, V_NUM, T_NUM)
+
+avg_shapley = Array(T_NUM, sfix)
+@for_range(T_NUM)
+def f(i):
+    @for_range(V_NUM)
+    def g(j):
+        avg_shapley[i] += shapley[j][i]
+    avg_shapley[i] = avg_shapley[i] / V_NUM
+
+print_ln("avg_shapley")
+print_array(avg_shapley,T_NUM)
 
 
 
