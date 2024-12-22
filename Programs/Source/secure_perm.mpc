@@ -14,11 +14,7 @@ def copy_array_2d(a):
     return b
 
 def copy_array(a):
-    b = a.same_shape()
-    @for_range(len(a))
-    def g(i):
-        b[i] = a[i]
-    return b
+    return Array.create_from(a)
 def test_array(actual,expected):
     @for_range(len(actual))
     def f(i):
@@ -73,8 +69,8 @@ def bit_split(x, bit_length_a, bit_length_b):
 
 def secure_perm_inv(sp, v):
 
-    sp_copy = copy_array(sp)
-    v_copy = copy_array(v)
+    sp_copy = Array.create_from(sp)
+    v_copy = Array.create_from(v)
     shuffle = sint.get_secure_shuffle(T_NUM)
     sp_copy.secure_permute(shuffle)
     v_copy.secure_permute(shuffle)
@@ -83,13 +79,11 @@ def secure_perm_inv(sp, v):
     return v_copy
 
 # sp：秘密分享的permutation， v待置换的数据
-# TODO 经验证，这个逻辑是有问题的
 def secure_perm(sp, v):
     # 复制数据
-    # sp_copy = sp
-    # v_copy = v
-    sp_copy = copy_array(sp)
-    v_copy = copy_array(v)
+    sp_copy = Array.create_from(sp)
+    v_copy = Array.create_from(v)
+
     print_ln("********")
     print_ln("before shuffle, sp_copy:")
     print_array(sp_copy, T_NUM)
@@ -196,41 +190,6 @@ x.permute(pp)
 print_ln("after permute, x:")
 print_array(x, T_NUM)
 
-# print_ln("**test secure array permute**")
-#
-# v = Array(T_NUM, sint)
-# @for_range(T_NUM)
-# def f(i):
-#     v[i] = sint(i)
-#
-# v.secure_shuffle()
-#
-# permutation_array = MultiArray([V_NUM, T_NUM], sint)
-# @for_range(V_NUM)
-# def f(i):
-#     @for_range(T_NUM)
-#     def g(j):
-#         permutation_array[i][j] = sint(j)
-#     permutation_array[i].secure_shuffle()
-#
-# print_ln("before permute, v:")
-# print_array(v, T_NUM)
-# print_ln("before permute, permutation_array:")
-# print_array_2d(permutation_array, V_NUM,T_NUM)
-#
-# permuted_v = MultiArray([V_NUM, T_NUM], sint)
-# @for_range(V_NUM)
-# def f(i):
-#     permuted_v[i] = secure_perm(permutation_array[i], v)
-#
-# print_ln("after permute, permuted_v:")
-# print_array_2d(permuted_v, V_NUM, T_NUM)
-# print_ln("after permute, v:")
-# print_array(v, T_NUM)
-# print_ln("after permute, permutation_array:")
-# print_array_2d(permutation_array, V_NUM,T_NUM)
-
-
 
 print_ln("**test shuffle and de-shuffle**")
 
@@ -250,3 +209,24 @@ print_ln("after shuffle, v:")
 print_array(v, T_NUM)
 print_ln("after shuffle, w:")
 print_array(w, T_NUM)
+
+print_ln("**test copy**")
+v = Array(T_NUM, sint)
+@for_range(T_NUM)
+def f(i):
+    v[i] = sint(i)
+
+w = Array.create_from(v)
+
+print_ln("before copy, v:")
+print_array(v, T_NUM)
+print_ln("before copy, w:")
+print_array(w, T_NUM)
+
+v.secure_shuffle()
+
+print_ln("after copy, v:")
+print_array(v, T_NUM)
+print_ln("after copy, w:")
+print_array(w, T_NUM)
+
