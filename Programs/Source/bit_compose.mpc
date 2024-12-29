@@ -31,10 +31,14 @@ def bit_split(x, bit_length_a, bit_length_b):
 # 如何把bitcompose后的数转换为sint?
 bits = [sbits.get_random_bit() for i in range(8)]
 a = sint.bit_compose(bits)
-print_ln("type:%s", str(type(a)))
+print_ln("type composed:%s", str(type(a)))
 print_ln('random: %s', a.reveal())
 
+# decompose生成一个sintbit的list，其中每一个表示了一个bit的sint类型（64bits）。
+# 即，这里跳过了用二进制组装的过程
 bits2 = a.bit_decompose(8)
+print_ln("type decomposed:%s", str(type(bits2[0])))
+
 # 说明decompose的结果，低位存储低位。并且，compose时，也是低位解释为低位。
 # 以下是人工组合的过程
 bits3 = [bits2[i] for i in range(4)]

@@ -6433,6 +6433,9 @@ class Array(_vectorizable):
         """
         return personal(player, self.create_from(self[:].reveal_to(player)._v))
 
+
+
+# , radix_and_output_permute=False
     def sort(self, n_threads=None, batcher=False, n_bits=None):
         r"""
         Sort in place using `radix sort
@@ -6457,6 +6460,33 @@ class Array(_vectorizable):
             from . import sorting
             sorting.radix_sort(self, self, n_bits=n_bits)
 
+
+    def sort_perm(self, n_threads=None, batcher=False, n_bits=None):
+        r"""
+        Sort in place using `radix sort
+        <https://eprint.iacr.org/2014/121>`_ with complexity
+        :math:`O(n \log n)` for :py:class:`sint` and :py:class:`sfix`,
+        and `Batcher's odd-even mergesort
+        <https://eprint.iacr.org/2011/122>`_ with :math:`O(n (\log
+        n)^2)` for :py:class:`sfloat`.
+
+        :param n_threads: number of threads to use (single thread by
+          default), need to use Batcher's algorithm for several threads
+        :param batcher: use Batcher's odd-even mergesort in any case
+        :param n_bits: number of bits in keys (default: global bit length)
+        """
+        if batcher or self.value_type.n_elements() > 1 or \
+                program.options.binary:
+            library.loopy_odd_even_merge_sort(self, n_threads=n_threads)
+        else:
+            if (n_threads or 1) > 1:
+                raise CompilerError('multi-threaded sorting only implemented '
+                                    'with Batcher\'s odd-even mergesort')
+            from . import sorting
+            return sorting.radix_sort_perm(self, self, n_bits=n_bits)
+
+    # def sortTest(self):
+    #     return sort(1)
     def to_row_matrix(self):
         """
         Returns the array as 1xN matrix.

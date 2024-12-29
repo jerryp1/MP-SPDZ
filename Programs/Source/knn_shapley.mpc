@@ -3,6 +3,11 @@ from Compiler import mpc_math
 from Compiler.types import MultiArray
 import copy
 
+# todo 以下具体是什么过程？
+program.use_edabit(True)
+# spdz2k中不能使用
+# program.use_split(4)
+
 # 训练数据量
 T_NUM = 3
 # 验证数据量
@@ -74,14 +79,16 @@ def sfix_to_sint(a):
     return a.v
 def sint_to_sfix(a):
     return a / (1 << sint(sfix.f))
+
 def bit_concat(a, b, bit_length_a, bit_length_b):
+    # return sint(0)
     a_bits = a.bit_decompose(bit_length_a)
     b_bits = b.bit_decompose(bit_length_b)
     c_bits = a_bits + b_bits
-
     return sint.bit_compose(c_bits)
 
 def bit_split(x, bit_length_a, bit_length_b):
+    # return sint(0), sint(0)
     length = bit_length_a + bit_length_b
     x_bits = x.bit_decompose(length)
     bits_a = [x_bits[i] for i in range(bit_length_a)]
@@ -99,18 +106,15 @@ def test(actual, expected):
 # 定义计算距离的函数
 def dist(v1, v2, length):
     # 初始化差值
-        sum_of_squares = sfix(0)
-
-        # 计算向量差的平方和
-        for i in range(length):
-            diff = v1[i] - v2[i]
-            sum_of_squares += diff * diff
-
-        # 计算平方根
-        distance = mpc_math.sqrt(sum_of_squares)
-
-        return distance
-        # return sum_of_squares
+    sum_of_squares = sfix(0)
+    # 计算向量差的平方和
+    for i in range(length):
+        diff = v1[i] - v2[i]
+        sum_of_squares += diff * diff
+    # 计算平方根
+    # distance = mpc_math.sqrt(sum_of_squares)
+    # return distance
+    return sum_of_squares
 
 
 # 输入数据。暂时定义为，3个参与方 每方只有一条数据，包括3个特征
@@ -175,15 +179,18 @@ def f(i):
     @for_range(T_NUM)
     def g(j):
         # 计算串接结果
-        concat_r = bit_concat(j,sfix_to_sint(dists[i][j]), V_LEN,V_LEN_SFIX)
-        to_be_sorted[i][j] = concat_r
+        to_be_sorted[i][j] = bit_concat(j,sfix_to_sint(dists[i][j]), V_LEN,V_LEN_SFIX)
 
 # 计算排序
 # print_ln("before sort(concated)")
 # print_array_2d(to_be_sorted, V_NUM, T_NUM)
-@for_range(V_NUM)
+print_ln("begin sorting")
+@for_range_opt(V_NUM)
 def f(i):
     to_be_sorted[i].sort()
+    # print_ln("test!")
+    # print_array(test, len(test))
+print_ln("end sorting")
 # print_ln("after sort(concated)")
 # print_array_2d(to_be_sorted, V_NUM, T_NUM)
 
