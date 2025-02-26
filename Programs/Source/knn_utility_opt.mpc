@@ -1,0 +1,132 @@
+from Compiler.library import *
+from Compiler import mpc_math
+from Compiler.types import MultiArray
+import copy
+from Compiler.my_util import *
+
+program.use_edabit(True)
+# spdz2k中不能使用
+# program.use_split(4)
+
+# 训练数据量
+T_NUM = 3
+# 验证数据量
+V_NUM = 4
+# 特征数量
+F_NUM = 3
+# 有效位
+V_LEN = 16
+# 浮点数整数形式的有效位
+V_LEN_SFIX = V_LEN + sfix.f
+
+K = 2
+
+# 输入数据。暂时定义为，3个参与方 每方只有一条数据，包括3个特征
+x_train = MultiArray([T_NUM, F_NUM], sfix)
+y_train = Array(T_NUM, sint)
+# y_train.alloc()
+
+# party0 input
+@for_range(F_NUM)
+def f(i):
+    x_train[0][i] = sfix.get_input_from(0)
+y_train[0] = sint.get_input_from(0)
+
+# party1 input
+@for_range(F_NUM)
+def f(i):
+    x_train[1][i] = sfix.get_input_from(1)
+y_train[1] = sint.get_input_from(1)
+
+# party2 input
+@for_range(F_NUM)
+def f(i):
+    x_train[2][i] = sfix.get_input_from(2)
+y_train[2] = sint.get_input_from(2)
+
+# party4 (buyer) input 两条数据*3个特征=6
+x_valid = MultiArray([V_NUM,F_NUM], sfix)
+y_valid = Array(V_NUM, sfix)
+@for_range(V_NUM)
+def f(i):
+    @for_range(F_NUM)
+    def g(j):
+        x_valid[i][j] = sfix.get_input_from(3)
+@for_range(V_NUM)
+def f(i):
+    y_valid[i] = sint.get_input_from(3)
+
+
+def knn_utility(x_train,y_train,x_valid,y_valid,K):
+    T_NUM = len(x_train)
+    V_NUM = len(x_valid)
+    F_NUM = len(x_train[0])
+    print_ln(T_NUM)
+    print_ln(V_NUM)
+    print_ln(F_NUM)
+
+    # 对于每个valid数据都计算距离
+    dists = MultiArray([V_NUM,T_NUM], sfix)
+    @for_range(V_NUM)
+    def f(i):
+        @for_range(T_NUM)
+        def g(j):
+            dists[i][j] = dist(x_train[j], x_valid[i], F_NUM)
+            print_ln('dist: %s', dists[i][j].reveal())
+
+
+    to_be_sorted = MultiArray([V_NUM, T_NUM], sint)
+
+    print_ln("original dist")
+    print_array_2d(dists, V_NUM, T_NUM)
+    @for_range(V_NUM)
+    def f(i):
+        @for_range(T_NUM)
+        def g(j):
+            to_be_sorted[i][j] = sfix_to_sint(dists[i][j])
+
+    # 计算排序
+    print_ln("begin sorting")
+    permutation = MultiArray([V_NUM, T_NUM], sint)
+    @for_range_opt(V_NUM)
+    def f(i):
+        permutation[i] = to_be_sorted[i].sort_perm()
+    print_ln("end sorting")
+
+    print_ln("after split, permutation")
+    print_array_2d(permutation, V_NUM, T_NUM)
+
+    # 应用permutation到y
+    print_ln("before permute, y_train")
+    print_array(y_train, T_NUM)
+    print_ln("before permute, permutation")
+    print_array_2d(permutation, V_NUM, T_NUM)
+
+    permuted_y = MultiArray([V_NUM, T_NUM], sint)
+    @for_range(V_NUM)
+    def f(i):
+        permuted_y[i] = secure_perm(permutation[i], y_train)
+
+    print_ln("after permute, permuted_y")
+    print_array_2d(permuted_y, V_NUM, T_NUM)
+
+    # 计算utility
+    equality = Array(V_NUM, sfix)
+
+
+    @for_range(V_NUM)
+    def f(i):
+        @for_range(K)
+        def g(j):
+            equality[i] = (permuted_y[i][j] == y_valid[i])
+        equality[i] = equality[i] / K
+
+    utility = Array(1, sfix)
+    @for_range(V_NUM)
+    def f(i):
+        utility[0] = equality[i] + utility[0]
+    utility[0] = utility[0] / V_NUM
+
+    print_ln('utility:%s', utility[0].reveal())
+
+knn_utility(x_train,y_train,x_valid, y_valid, K)

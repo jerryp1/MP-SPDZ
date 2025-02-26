@@ -1,0 +1,69 @@
+from Compiler.my_util import *
+def partition(arr, low, high):
+    pivot = arr[high]  # 选择最后一个元素作为基准
+
+
+    i = MemValue(low -1) # i 是较小元素的索引
+    # print_ln("i[0]:%s",i[0])
+    @for_range(low, high)
+    def f(j):
+        # print_ln("j:%s",j)
+        # print_ln("i[0]:%s", i[0])
+        print_array(arr, len(arr))
+        cmp = arr[j] <= pivot
+        @if_e(cmp.reveal() == 1)
+        def _():
+            print_ln("1!")
+            # a+=1
+            # low = low + a
+            # print_ln("i[0] will add one")
+            # print_ln("after i[0]:%s", i[0])
+            i.iadd(1) # 增加较小元素的索引
+            # print_ln("j:%s", j)
+            swap(arr, i, j)
+        @else_
+        def _():
+            # print_ln("0!")
+            pass
+        # print_ln("now: i[0]:%s", i)
+    swap(arr, i + 1, high)
+
+    return i + 1 # 返回基准的索引
+
+def quick_sort(arr, low, high):
+    # low = 1
+    # high = 2
+    if (low < high):
+        # 找到分区的索引，使得arr[p]是正确位置
+        pi = partition(arr, low, high)
+
+        # 递归排序分区前和分区后的元素
+        quick_sort(arr, low, pi - 1)
+        quick_sort(arr, pi + 1, high)
+
+    # @if_e(low < high)
+    # def _():
+    #     # 找到分区的索引，使得arr[p]是正确位置
+    #     pi = partition(arr, low, high)
+    #
+    #     # 递归排序分区前和分区后的元素
+    #     quick_sort(arr, low, pi - 1)
+    #     quick_sort(arr, pi + 1, high)
+    # @else_
+    # def _():
+    #     pass
+def main():
+
+    num = 5
+    sfix_array = Array(num, sfix)
+    @for_range(num)
+    def f(i):
+        sfix_array[i] = sfix(i)
+
+    # 执行快速排序
+    quick_sort(sfix_array, 0, num - 1)
+
+    # 输出排序后的数组
+    print_array(sfix_array, len(sfix_array))
+
+main()

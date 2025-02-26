@@ -76,6 +76,27 @@ import operator
 from functools import reduce
 import re
 
+def compare_and_swap(x, i, j, direction):
+    cnd = direction == (x[i] > x[j])
+    temp = cnd.if_else(x[i], x[j])
+    x[i] = cnd.if_else(x[j], x[i])
+    x[j] = temp
+
+def bitonic_merge(x, low, cnt, direction):
+    if cnt > 1:
+        mid = cnt // 2
+        @library.for_range(mid)
+        def f(i):
+            compare_and_swap(x, low + i, low + i + mid, direction)
+        bitonic_merge(x, low, mid, direction)
+        bitonic_merge(x, low + mid, mid, direction)
+
+def bitonic_sort(x, low, cnt, direction):
+    if cnt > 1:
+        mid = cnt // 2
+        bitonic_sort(x, low, mid, 1)      # ascending order
+        bitonic_sort(x, low + mid, mid, 0) # descending order
+        bitonic_merge(x, low, cnt, direction)
 
 class ClientMessageType:
     """ Enum to define type of message sent to external client. Each may be array of length n."""
@@ -6460,6 +6481,9 @@ class Array(_vectorizable):
             from . import sorting
             sorting.radix_sort(self, self, n_bits=n_bits)
 
+    def sort_bitonic(self):
+        bitonic_sort(self, 0, len(self), 1)
+
 
     def sort_perm(self, n_threads=None, batcher=False, n_bits=None):
         r"""
@@ -6484,6 +6508,8 @@ class Array(_vectorizable):
                                     'with Batcher\'s odd-even mergesort')
             from . import sorting
             return sorting.radix_sort_perm(self, self, n_bits=n_bits)
+
+
 
     # def sortTest(self):
     #     return sort(1)
