@@ -3,13 +3,19 @@ from Compiler import mpc_math
 from Compiler.types import MultiArray
 import copy
 from Compiler.my_util import *
+from time import process_time
 
 program.use_edabit(True)
-# spdz2k中不能使用
+program.set_bit_length(32)
+
+# program.use_trunc_pr = True
+# 只能在ring中使用
 # program.use_split(4)
 
+
+
 # 训练数据量
-T_NUM = 3
+T_NUM = 1 << 16
 # 验证数据量
 V_NUM = 4
 # 特征数量
@@ -18,30 +24,43 @@ F_NUM = 3
 V_LEN = 16
 # 浮点数整数形式的有效位
 V_LEN_SFIX = V_LEN + sfix.f
+K = 64
+# 线程数
+thread_num = 4
 
-K = 2
+
+print_ln("T_NUM:%s", T_NUM)
+print_ln("V_NUM:%s", V_NUM)
+print_ln("F_NUM:%s", F_NUM)
+print_ln("K:%s", K)
+print_ln("thread_num:%s", thread_num)
+
+
 
 # 输入数据。暂时定义为，3个参与方 每方只有一条数据，包括3个特征
 x_train = MultiArray([T_NUM, F_NUM], sfix)
 y_train = Array(T_NUM, sint)
 
 # party0 input
-@for_range(F_NUM)
-def f(i):
-    x_train[0][i] = sfix.get_input_from(0)
-y_train[0] = sint.get_input_from(0)
+
+@for_range_opt_multithread(thread_num,T_NUM)
+def g(j):
+    @for_range_opt(F_NUM)
+    def f(i):
+        x_train[j][i] = sfix.get_input_from(0)
+    y_train[j] = sint.get_input_from(0)
 
 # party1 input
-@for_range(F_NUM)
-def f(i):
-    x_train[1][i] = sfix.get_input_from(1)
-y_train[1] = sint.get_input_from(1)
-
-# party2 input
-@for_range(F_NUM)
-def f(i):
-    x_train[2][i] = sfix.get_input_from(2)
-y_train[2] = sint.get_input_from(2)
+# @for_range(F_NUM)
+# def f(i):
+#     x_train[1][i] = sfix.get_input_from(1)
+# y_train[1] = sint.get_input_from(1)
+#
+# # party2 input
+# @for_range(F_NUM)
+# def f(i):
+#     x_train[2][i] = sfix.get_input_from(2)
+# y_train[2] = sint.get_input_from(2)
 
 # party4 (buyer) input 两条数据*3个特征=6
 x_valid = MultiArray([V_NUM,F_NUM], sfix)
@@ -66,59 +85,69 @@ def knn_utility(x_train,y_train,x_valid,y_valid,K):
 
     # 对于每个valid数据都计算距离
     dists = MultiArray([V_NUM,T_NUM], sfix)
-    @for_range(V_NUM)
+
+    start = process_time()
+    @for_range_opt_multithread(thread_num,V_NUM)
     def f(i):
-        @for_range(T_NUM)
+        @for_range_opt(T_NUM)
         def g(j):
             dists[i][j] = dist(x_train[j], x_valid[i], F_NUM)
-            print_ln('dist: %s', dists[i][j].reveal())
+
+    t = process_time() - start
+    # print_ln("dist_time:%s",t)
 
 
     to_be_sorted = MultiArray([V_NUM, T_NUM], sint)
 
     print_ln("original dist")
-    print_array_2d(dists, V_NUM, T_NUM)
-    @for_range(V_NUM)
+    # print_array_2d(dists, V_NUM, T_NUM)
+    @for_range_opt_multithread(thread_num, V_NUM)
     def f(i):
-        @for_range(T_NUM)
+        @for_range_opt(T_NUM)
         def g(j):
             to_be_sorted[i][j] = sfix_to_sint(dists[i][j])
 
     # 计算排序
     print_ln("begin sorting")
     permutation = MultiArray([V_NUM, T_NUM], sint)
-    @for_range_opt(V_NUM)
+    start = process_time()
+    @for_range_opt_multithread(thread_num, V_NUM)
     def f(i):
+        print_ln("current sorting index:%s", i)
         permutation[i] = to_be_sorted[i].sort_perm()
+    t = process_time() - start
+    # print_ln("sort_time:%s",t)
     print_ln("end sorting")
 
-    print_ln("after split, permutation")
-    print_array_2d(permutation, V_NUM, T_NUM)
-
     # 应用permutation到y
-    print_ln("before permute, y_train")
-    print_array(y_train, T_NUM)
+    # print_ln("before permute, y_train")
+    # print_array(y_train, T_NUM)
     print_ln("before permute, permutation")
-    print_array_2d(permutation, V_NUM, T_NUM)
+    # print_array_2d(permutation, V_NUM, T_NUM)
 
     permuted_y = MultiArray([V_NUM, T_NUM], sint)
-    @for_range(V_NUM)
+    start = process_time()
+    @for_range_opt_multithread(thread_num, V_NUM)
     def f(i):
         permuted_y[i] = secure_perm(permutation[i], y_train)
+    t = process_time() - start
+    # print_ln("perm_time:%s",t)
 
     print_ln("after permute, permuted_y")
-    print_array_2d(permuted_y, V_NUM, T_NUM)
+    # print_array_2d(permuted_y, V_NUM, T_NUM)
 
     # 计算utility
     equality = Array(V_NUM, sfix)
 
-
+    start = process_time()
     @for_range(V_NUM)
     def f(i):
         @for_range(K)
         def g(j):
             equality[i] = (permuted_y[i][j] == y_valid[i])
         equality[i] = equality[i] / K
+    t = process_time() - start
+    # print_ln("k_equality_time:%s",t)
 
     utility = Array(1, sfix)
     @for_range(V_NUM)

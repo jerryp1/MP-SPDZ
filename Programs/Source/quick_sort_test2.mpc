@@ -1,0 +1,59 @@
+from Compiler.my_util import *
+import sys
+# 没有迭代和
+def quick_sort(arr):
+    if len(arr) <= 1:
+        return arr
+
+    start = 0
+    end = len(arr) - 1
+
+    while start < end:
+        pivot_index = partition(arr, start, end)
+
+        # 确定哪一侧的子数组较小，优先对较小的部分进行排序
+        if pivot_index - start < end - pivot_index:
+            new_end = pivot_index - 1
+            # 排序左侧
+            while start < new_end:
+                pivot_index_left = partition(arr, start, new_end)
+                new_end = pivot_index_left - 1
+            start = pivot_index + 1
+        else:
+            new_start = pivot_index + 1
+            # 排序右侧
+            while new_start < end:
+                pivot_index_right = partition(arr, new_start, end)
+                new_start = pivot_index_right + 1
+            end = pivot_index - 1
+
+    return arr
+
+def partition(arr, low, high):
+    pivot = arr[high]
+    i = low - 1
+
+    for j in range(low, high):
+        if arr[j] < pivot:
+            i += 1
+            arr[i], arr[j] = arr[j], arr[i]
+
+    arr[i + 1], arr[high] = arr[high], arr[i + 1]
+    return i + 1
+
+
+def main():
+
+    num = 5
+    sfix_array = Array(num, sfix)
+    @for_range(num)
+    def f(i):
+        sfix_array[i] = sfix(i)
+
+    # 执行快速排序
+    quick_sort(sfix_array, 0, num - 1)
+
+    # 输出排序后的数组
+    print_array(sfix_array, len(sfix_array))
+
+main()

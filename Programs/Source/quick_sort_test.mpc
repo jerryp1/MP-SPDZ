@@ -1,0 +1,61 @@
+from Compiler.my_util import *
+import sys
+sys.setrecursionlimit(5000)
+
+def partition(arr, low, high):
+    pivot = arr[high]
+
+    i = MemValue(low - 1)
+
+    @for_range(low, high)
+    def f(j):
+    # for j in range(low, high):
+        cmp = arr[j] < pivot  # 比较 arr[j] 和 pivot
+        # 使用 if_else 替代 if
+        @if_e(cmp.reveal() == 1)
+        def _():
+              # 使用 nonlocal 访问外部作用域的 i
+            i.iadd(1)
+            swap(arr, i, j)
+        @else_
+        def _():
+
+            pass
+
+    swap(arr, i + 1, high)
+    return i + 1
+
+def quick_sort(arr):
+    low = 0
+    high = len(arr) - 1
+    stack = [(low, high)]  # 用于记录未排序的边界
+
+    while stack:
+        low, high = stack.pop()
+        cmp = low < high
+        # if cmp:
+        #     pivot_index = partition(arr, low, high)
+        #     stack.append((low, pivot_index - 1))  # 存储左子数组
+        #     stack.append((pivot_index + 1, high)) # 存储右子数组
+
+        @if_e(cmp == 1)
+        def _():
+            pivot_index = partition(arr, low, high)
+            stack.append((low, pivot_index - 1))  # 存储左子数组
+            stack.append((pivot_index + 1, high)) # 存储右子数组
+        @else_
+        def _():
+            pass
+def main():
+    num = 5
+    sfix_array = Array(num, sfix)
+    @for_range(num)
+    def f(i):
+        sfix_array[i] = sfix(i)
+
+    quick_sort(sfix_array)
+
+    # 输出排序后的数组
+    print_array(sfix_array, len(sfix_array))
+
+main()
