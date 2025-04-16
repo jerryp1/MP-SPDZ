@@ -1,0 +1,20 @@
+from circuit import Circuit
+sb128 = sbits.get_type(128)
+
+sb512 = sbits.get_type(512)
+sb256 = sbits.get_type(256)
+sb1280 = sbits.get_type(1280)
+
+block = sb128(0x2b7e151628aed2a6abf7158809cf4f3c)
+expanded_key = sb1280(0x6bc1bee22e409f96e93d7e117393172a)
+print("type_input:" + str(type(block)))
+
+n = 1
+lowmc = Circuit('LowMC_File')
+ciphertexts = lowmc(sbitvec([block] * n), sbitvec([expanded_key] * n))
+print("len:"+str(len(ciphertexts.elements())))
+print("type_result:"+str(type(ciphertexts.elements()[0])))
+ciphertexts.elements()[0].reveal().print_reg()
+
+# 要实现串接，需要计算明文比特矩阵和密态比特向量相乘（block*向量 = 向量）
+# 另外，电路里面应该需要xor提前生成好的常数

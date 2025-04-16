@@ -1,0 +1,46 @@
+
+from Compiler.GC.types import sbits, sbitvec
+from Compiler.circuit import Circuit
+from Compiler.library import print_ln, for_range_opt_multithread, for_range, if_e
+from Compiler.types import Array
+
+# (key,message)
+def one_round(mi, pre_h, aes128):
+    assert (len(pre_h.elements()) == len(mi.elements()))
+    enc = aes128(mi, pre_h)
+    hi = sbitvec.bit_xor(enc, pre_h)
+    return hi
+
+# 并行vector数量
+n_vector = 1
+# 数据block的长度
+n_block = 10
+
+sb128 = sbits.get_type(128)
+sb512 = sbits.get_type(512)
+sb256 = sbits.get_type(256)
+sb1280 = sbits.get_type(1280)
+# 初始化电路
+aes128 = Circuit('aes_128')
+
+
+# 初始化数据block
+blocks = [sbitvec([sb128(0x2b7e151628aed2a6abf7158809cf4f3c)] * n_vector) for i in range(n_block)]
+
+# 初始iv h0
+iv_block = sbitvec([sb128(0x2b7e151628aed2a6abf7158809cf4f3c)] * n_vector)
+
+# hi
+hi = one_round(blocks[0], iv_block , aes128)
+
+for i in range(1, n_block):
+    print("i:" + str(i))
+    hi = one_round(blocks[i], hi, aes128)
+
+hi.elements()[0].reveal().print_reg()
+
+
+
+
+
+
